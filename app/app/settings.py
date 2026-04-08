@@ -60,12 +60,11 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'app.wsgi.application'
 
-
-# settings.py
-
+# Database
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.dummy',
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
 
@@ -95,7 +94,3 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
-# Asegúrate de mantener estas líneas que ya tienes para evitar errores de escritura
-SESSION_ENGINE = 'django.contrib.sessions.backends.signed_cookies'
-MESSAGE_STORAGE = 'django.contrib.messages.storage.session.SessionStorage'

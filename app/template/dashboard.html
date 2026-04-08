@@ -216,7 +216,6 @@
             overflow-x: auto;
         }
 
-        /* Scrollbar estilizado */
         .table-wrapper::-webkit-scrollbar { width: 6px; height: 6px; }
         .table-wrapper::-webkit-scrollbar-track { background: #f1f5f9; }
         .table-wrapper::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
@@ -344,7 +343,6 @@
 </head>
 <body>
 
-    <!-- ═══════════════ HEADER ═══════════════ -->
     <header>
         <div class="header-logo">
             <img src="{% static 'img/logo_fondo_oscuro.png' %}" alt="Logo" style="height:80px;">
@@ -356,10 +354,8 @@
         </div>
     </header>
 
-    <!-- ═══════════════ MAIN ═══════════════ -->
     <main>
 
-        <!-- Stats -->
         <div class="stats-row">
             <div class="stat-card">
                 <div class="stat-icon"><i class="fa-solid fa-users"></i></div>
@@ -384,10 +380,8 @@
             </div>
         </div>
 
-        <!-- Panel con tabs -->
         <div class="panel">
 
-            <!-- Tabs -->
             <div class="tabs-bar">
                 <button class="tab-btn active" onclick="switchTab('arl', this)">
                     <i class="fa-solid fa-table-list"></i>
@@ -401,7 +395,6 @@
                 </button>
             </div>
 
-            <!-- Tab: Cruce ARL -->
             <div class="tab-content active" id="tab-arl">
                 <div class="table-wrapper">
                     <table>
@@ -447,7 +440,6 @@
                 </div>
             </div>
 
-            <!-- Tab: Reporte EMP -->
             <div class="tab-content" id="tab-emp">
                 <div class="table-wrapper">
                     <table>
@@ -477,7 +469,6 @@
                 </div>
             </div>
 
-            <!-- Barra de descarga -->
             <div class="download-bar">
                 <button class="btn-download" onclick="downloadInfra()">
                     <i class="fa-solid fa-download"></i>
@@ -488,7 +479,6 @@
         </div>
     </main>
 
-    <!-- ═══════════════ LOADING ═══════════════ -->
     <div id="loading-overlay">
         <div class="loading-card">
             <i class="fa-solid fa-spinner fa-spin"></i>
@@ -496,11 +486,25 @@
         </div>
     </div>
 
-    <!-- ═══════════════ ALERTA ═══════════════ -->
     <div id="alerta-overlay"><div id="alerta-content"></div></div>
 
+    <!-- Datos embebidos desde el servidor (sin sesión, solo cliente) -->
+    {{ reporte_data_json|json_script:"reporte-data" }}
+    {{ trabajadores_data_json|json_script:"trabajadores-data" }}
+    {{ infra_base64|json_script:"infra-base64" }}
+
     <script>
-        // ── Cambio de tabs ──
+        // Leer datos desde los scripts JSON
+        function getEmbeddedData(id) {
+            const element = document.getElementById(id);
+            if (!element) return null;
+            return JSON.parse(element.textContent);
+        }
+
+        const reporteData = getEmbeddedData('reporte-data');
+        const trabajadoresData = getEmbeddedData('trabajadores-data');
+        const infraBase64 = getEmbeddedData('infra-base64');
+
         function switchTab(tabId, btn) {
             document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -508,7 +512,6 @@
             btn.classList.add('active');
         }
 
-        // ── Descarga ──
         function downloadInfra() {
             const loadingOverlay = document.getElementById('loading-overlay');
             loadingOverlay.style.display = 'flex';
@@ -519,6 +522,11 @@
                     'X-CSRFToken': getCookie('csrftoken'),
                     'Content-Type': 'application/json',
                 },
+                body: JSON.stringify({
+                    reporte_data: reporteData,
+                    trabajadores_data: trabajadoresData,
+                    infra_base64: infraBase64,
+                })
             })
             .then(response => {
                 if (!response.ok) return response.json().then(err => { throw err; });

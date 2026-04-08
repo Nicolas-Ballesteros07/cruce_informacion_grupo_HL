@@ -1,8 +1,11 @@
 import json
 import io
+import base64
+import pandas as pd
 from django.shortcuts import render
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.http import require_POST
+from django.views.decorators.csrf import csrf_exempt
 from .utils import (
     parse_reporte,
     parse_trabajadores,
@@ -11,10 +14,12 @@ from .utils import (
     generate_infra,
 )
 
+
 def index(request):
     """
-    GET → muestra el formulario de carga.
-    POST → procesa los tres archivos y muestra el dashboard con la previsualización.
+    GET → formulario de carga.
+    POST → procesa archivos, genera previsualización y embebe los datos
+            en el template (sin usar sesión ni base de datos).
     """
     if request.method == "GET":
         return render(request, "upload.html")
@@ -48,17 +53,15 @@ def index(request):
         return render(request, "upload.html",
                       {"errors": [f"Error leyendo Trabajadores: {e}"]})
 
-    # Guardar INFRA en sesión (bytes)
+    # Leer INFRA como bytes y codificar a base64 para enviar al cliente
     infra_bytes = infra_file.read()
-    request.session["infra_bytes"] = list(infra_bytes)
-    request.session["reporte_json"] = df_rep.to_json(
-        orient="records", date_format="iso", default_handler=str
-    )
-    request.session["trabajadores_json"] = df_trab.to_json(
-        orient="records", date_format="iso", default_handler=str
-    )
+    infra_base64 = base64.b64encode(infra_bytes).decode('ascii')
 
-    # Previsualización
+    # Convertir DataFrames a listas de diccionarios (JSON serializable)
+    reporte_data = df_rep.to_dict(orient='records')
+    trabajadores_data = df_trab.to_dict(orient='records')
+
+    # Previsualizaciones
     cruce_preview = build_cruce_preview(df_trab)
     emp_preview = build_emp_preview(df_rep)
 
@@ -69,31 +72,41 @@ def index(request):
         "total_empleados": len(df_rep),
         "cruce_cols": list(cruce_preview[0].keys()) if cruce_preview else [],
         "emp_cols": list(emp_preview[0].keys()) if emp_preview else [],
+        # Datos completos embebidos en el template
+        "reporte_data_json": json.dumps(reporte_data, default=str),
+        "trabajadores_data_json": json.dumps(trabajadores_data, default=str),
+        "infra_base64": infra_base64,
     }
     return render(request, "dashboard.html", context)
 
 
 @require_POST
+@csrf_exempt   # Solo por simplicidad; en producción usar CSRF con token adecuado
 def download_infra(request):
     """
-    Genera el archivo INFRA con los datos de Reporte y Trabajadores
-    inyectados y lo devuelve como descarga.
+    Recibe los datos desde el cliente (reporte, trabajadores e infra base64),
+    reconstruye los DataFrames y el archivo INFRA original, y devuelve el Excel final.
     """
-    import pandas as pd
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Datos inválidos"}, status=400)
 
-    infra_bytes_list = request.session.get("infra_bytes")
-    reporte_json = request.session.get("reporte_json")
-    trabajadores_json = request.session.get("trabajadores_json")
+    reporte_data = data.get("reporte_data")
+    trabajadores_data = data.get("trabajadores_data")
+    infra_base64 = data.get("infra_base64")
 
-    if not infra_bytes_list or not reporte_json or not trabajadores_json:
-        return JsonResponse(
-            {"error": "Sesión expirada. Por favor vuelve a cargar los archivos."},
-            status=400,
-        )
+    if not all([reporte_data, trabajadores_data, infra_base64]):
+        return JsonResponse({"error": "Faltan datos necesarios"}, status=400)
 
-    infra_bytes = bytes(infra_bytes_list)
-    df_rep = pd.read_json(io.StringIO(reporte_json), orient="records")
-    df_trab = pd.read_json(io.StringIO(trabajadores_json), orient="records")
+    try:
+        # Reconstruir DataFrames
+        df_rep = pd.DataFrame(reporte_data)
+        df_trab = pd.DataFrame(trabajadores_data)
+        # Decodificar INFRA
+        infra_bytes = base64.b64decode(infra_base64)
+    except Exception as e:
+        return JsonResponse({"error": f"Error al reconstruir datos: {e}"}, status=400)
 
     try:
         output_bytes = generate_infra(infra_bytes, df_rep, df_trab)

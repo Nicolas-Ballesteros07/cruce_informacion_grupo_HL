@@ -1,4 +1,3 @@
-# app/wsgi.py
 import os
 import sys
 from django.core.wsgi import get_wsgi_application
@@ -11,4 +10,4 @@ if path not in sys.path:
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'app.settings')
 
 application = get_wsgi_application()
-app = application
+app = application  # Esto es lo que Vercel necesita
