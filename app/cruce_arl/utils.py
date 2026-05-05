@@ -280,7 +280,6 @@ def generate_infra(infra_bytes: bytes, df_rep: pd.DataFrame, df_trab: pd.DataFra
     out.seek(0)
     return out.read()
 
-
 # ------------------------------------------------------------
 # 5.1 Llenar hoja "Cruce ARL"
 # ------------------------------------------------------------
