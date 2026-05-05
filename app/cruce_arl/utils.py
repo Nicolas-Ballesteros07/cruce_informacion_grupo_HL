@@ -281,6 +281,7 @@ def generate_infra(infra_bytes: bytes, df_rep: pd.DataFrame, df_trab: pd.DataFra
     return out.read()
 
 
+
 # ------------------------------------------------------------
 # 5.1 Llenar hoja "Cruce ARL"
 # ------------------------------------------------------------
@@ -312,6 +313,12 @@ def _fill_cruce_sheet(wb, df_trab: pd.DataFrame, rep_dict: dict):
         ref_numfmts[c]    = src.number_format
         if c in (11, 12, 13) and src.value and str(src.value).startswith("="):
             ref_formulas[c] = str(src.value)
+
+    # ✅ CORRECCIÓN: fórmula robusta para K (col 11), extrae el código antes del " - "
+    ref_formulas[11] = (
+        '=IFERROR(MID(VLOOKUP(B2,EMP!$A:$CK,89,0),'
+        '1,FIND(" ",VLOOKUP(B2,EMP!$A:$CK,89,0))-1),0)'
+    )
 
     _re_row2 = re.compile(r"([A-Z]+)2\b")
 
@@ -365,7 +372,6 @@ def _fill_cruce_sheet(wb, df_trab: pd.DataFrame, rep_dict: dict):
     ws.conditional_formatting.add(validacion_range, rule_ok)
 
     print(f"Cruce ARL actualizado: {total} filas, CF verde en {validacion_range}")
-
 
 # ------------------------------------------------------------
 # 5.2 Llenar hoja "EMP"
@@ -452,13 +458,15 @@ def _fill_emp_sheet(wb, df_rep: pd.DataFrame, trab_dict: dict):
             val = rep_row.get(rep_col)
             cell.value = val if not pd.isna(val) else None
 
+        
         if col_c_costo is not None:
-            ccf_val = rep_row.get("CCF", "")
-            if ccf_val and str(ccf_val) not in ("nan", "None", ""):
+            ccosto_val = rep_row.get("C.COSTO", "")   # ← toma C.COSTO directamente
+            if ccosto_val and str(ccosto_val) not in ("nan", "None", ""):
                 cell = ws.cell(row=excel_row, column=col_c_costo)
-                cell.value = str(ccf_val)
+                cell.value = str(ccosto_val)           # escribe "20136 - BARRICK ETP-HL"
                 cell.number_format = "@"
 
+    
         codigo_val = rep_row.get("Código", "")
         if codigo_val and str(codigo_val) not in ("nan", "None", ""):
             cell = ws.cell(row=excel_row, column=2)
